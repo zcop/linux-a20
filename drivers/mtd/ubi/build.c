@@ -897,9 +897,8 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	 */
 	if (mtd->type == MTD_MLCNANDFLASH &&
 	    !(mtd->flags & MTD_SLC_ON_MLC_EMULATION)) {
-		pr_err("ubi: refuse attaching mtd%d - MLC NAND is not supported\n",
+		pr_warn("ubi: attaching mtd%d - MLC NAND is not supported\n",
 			mtd->index);
-		return -EINVAL;
 	}
 
 	/* UBI cannot work on flashes with zero erasesize. */
