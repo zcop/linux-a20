@@ -90,41 +90,85 @@
 	};
 };
 
+/* --- NAND PIN CTRL --- */
 &pio {
-	nand0_pins_a: nand0_pins@0 {
-		/* From Olimex FEX: PC0,1,2,4,5,6,8..15,16 */
-		pins = "PC0",  "PC1",  "PC2",
-		       "PC4",  "PC5",  "PC6",
-		       "PC8",  "PC9",  "PC10", "PC11",
-		       "PC12", "PC13", "PC14", "PC15",
-		       "PC16";
+	/* Base NAND signals: WE#, ALE, CLE, RE#, D0..D7, WP# */
+	nand_pins_a: nand_pins@0 {
+		pins = "PC0",  /* WE# */
+		       "PC1",  /* ALE */
+		       "PC2",  /* CLE */
+		       "PC5",  /* RE# (nRE) */
+		       "PC8", "PC9", "PC10", "PC11",  /* D0..D3 */
+		       "PC12","PC13","PC14","PC15",  /* D4..D7 */
+		       "PC16"; /* WP# */
 		function = "nand0";
-		/* pull-ups/downs are handled by controller or default state */
+		drive-strength = <30>;
+		bias-disable;
+	};
+
+	/* Chip Select 0 (CE0) */
+	nand_cs0_pins_a: nand_cs0_pins@0 {
+		pins = "PC4";
+		function = "nand0";
+		drive-strength = <30>;
+		bias-disable;
+	};
+
+	/* Ready/Busy 0 (RB0) */
+	nand_rb0_pins_a: nand_rb0_pins@0 {
+		pins = "PC6";
+		function = "nand0";
+		drive-strength = <30>;
+		bias-disable;
 	};
 };
 
+/* --- NAND CONTROLLER --- */
 &nfc {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&nand0_pins_a>;
+	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
 
+	/* One chip on CS0 */
 	nand@0 {
+		reg = <0>;
 		#address-cells = <2>;
 		#size-cells = <2>;
-		reg = <0>;
-		allwinner,rb = <0>;          /* RB0 */
-		nand-ecc-mode = "hw";
-		nand-on-flash-bbt;
 
-		/* Simple starter partitions; adjust later */
+		nand-bus-width = <8>;
+		allwinner,rb = <0>;          /* RB0 */
+		
+		/* ECC for H27UBG8T2BTR-BC (8K+640B page, MLC) */
+		nand-ecc-mode = "hw";
+		nand-ecc-algo = "bch";
+		nand-ecc-step-size = <1024>;
+		nand-ecc-strength = <40>;
+		
+		/* Or instead of the 3 lines above, you may use:
+		   nand-ecc-maximize;  // let controller pick strongest valid ECC */
+		nand-on-flash-bbt;
+		
+		/* pSLC mode */
+		slc-mode = <1>;
+		
+		/* Partitions (adjust as you like) */
 		partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			boot0@0     { label = "boot0"; reg = <0x00000000 0x00200000>; };
-			uboot@200000{ label = "uboot"; reg = <0x00200000 0x00200000>; };
-			main@400000 { label = "main";  reg = <0x00400000 0x1FC00000>; };
+			/* 8 MiB for SPL/U-Boot (room for copies & bad blocks) */
+			uboot@0 {
+				label = "u-boot";
+				reg = <0x00000000 0x00800000>;
+				read-only;
+			};
+
+			/* Remainder for UBI/UBIFS; size 0 = to end (must be last) */
+			ubifs@800000 {
+				label = "ubifs";
+				reg = <0x00800000 0x00000000>;
+			};
 		};
 	};
 };
@@ -391,3 +435,4 @@
 	usb2_vbus-supply = <&reg_usb2_vbus>;
 	status = "okay";
 };
+

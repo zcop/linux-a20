@@ -785,8 +785,19 @@ static int write_bbt(struct nand_chip *this, uint8_t *buf,
 
 		block = get_bbt_block(this, td, md, chip);
 		if (block < 0) {
-			pr_err("No space left to write bad block table\n");
-			res = block;
+			/* Instead of failing hard when there is no room to place the
+			 * on-flash BBT, degrade gracefully and keep using the in-RAM
+			 * BBT only. This mirrors the behaviour of kernels without
+			 * NAND_BBT_USE_FLASH and prevents probe failures on worn-out
+			 * devices which can no longer host a BBT area.
+			 */
+			pr_warn("No space left to write bad block table; continuing with RAM BBT\n");
+			if (td)
+				td->options &= ~(NAND_BBT_USE_FLASH | NAND_BBT_WRITE);
+			if (md)
+				md->options &= ~(NAND_BBT_USE_FLASH | NAND_BBT_WRITE);
+			this->bbt_options &= ~(NAND_BBT_USE_FLASH | NAND_BBT_WRITE);
+			res = 0;
 			goto outerr;
 		}
 
